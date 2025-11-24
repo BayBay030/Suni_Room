@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Room - 較低視角擁擠版</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        }
+        button {
+            margin: 5px 0;
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <strong>DJ 房間 - 擁擠版</strong><br>
+        🖱️ 拖曳滑鼠：旋轉視角<br>
+        🔍 滾輪：縮放<br>
+        📍 右鍵拖曳：平移<br><br>
+        💡 提示：書桌、畫架、窗戶等<br>
+        &nbsp;&nbsp;&nbsp;都是 PNG 平面貼圖
+    </div>
+    
+    <div id="controls">
+        <strong>視角切換</strong><br>
+        <button onclick="setCameraView(10, 8, 10)">主視角</button>
+        <button onclick="setCameraView(12, 10, 12)">稍高一點</button>
+        <button onclick="setCameraView(8, 6, 8)">更低沉浸</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // 場景設定
+        let scene, camera, renderer, controls;
+        
+        function init() {
+            // 建立場景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0e6d2);
+            
+            // 建立相機（較低視角）
+            const aspect = window.innerWidth / window.innerHeight;
+            camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000);
+            camera.position.set(10, 8, 10);
+            camera.lookAt(0, 0, 0);
+            
+            // 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // 軌道控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // 燈光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(10, 15, 10);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // 建立房間
+            createRoom();
+            
+            // 視窗大小調整
+            window.addEventListener('resize', onWindowResize, false);
+            
+            animate();
+        }
+        
+        function createPNGTexture(color, text) {
+            // 動態生成假的 PNG 貼圖（實際應該載入真實圖片）
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 512;
+            
+            // 背景色
+            context.fillStyle = color;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 邊框
+            context.strokeStyle = '#333';
+            context.lineWidth = 8;
+            context.strokeRect(0, 0, canvas.width, canvas.height);
+            
+            // 文字標示
+            context.font = 'Bold 48px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, 256, 256);
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+        
+        function createRoom() {
+            // === 地板（縮小範圍，更擁擠）===
+            const floorGeometry = new THREE.PlaneGeometry(16, 16);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B7355,
+                roughness: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // === 地毯（中央，放大）===
+            const carpetGeometry = new THREE.PlaneGeometry(8, 8);
+            const carpetMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513,
+                roughness: 1.0
+            });
+            const carpet = new THREE.Mesh(carpetGeometry, carpetMaterial);
+            carpet.rotation.x = -Math.PI / 2;
+            carpet.position.y = 0.02;
+            scene.add(carpet);
+            
+            // === 北牆（後方）===
+            const northWallGeometry = new THREE.PlaneGeometry(16, 8);
+            const northWallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x3a3a3a,
+                side: THREE.DoubleSide
+            });
+            const northWall = new THREE.Mesh(northWallGeometry, northWallMaterial);
+            northWall.position.set(0, 4, -8);
+            scene.add(northWall);
+            
+            // === 西牆（左側）===
+            const westWallGeometry = new THREE.PlaneGeometry(16, 8);
+            const westWallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4a4a4a,
+                side: THREE.DoubleSide
+            });
+            const westWall = new THREE.Mesh(westWallGeometry, westWallMaterial);
+            westWall.position.set(-8, 4, 0);
+            westWall.rotation.y = Math.PI / 2;
+            scene.add(westWall);
+            
+            // 東牆已移除，保持開放空間
+            
+            // === DJ 台（3D，原尺寸 4x1.5x2，往左移）===
+            const djBoothGeometry = new THREE.BoxGeometry(4, 1.5, 2);
+            const djBoothMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a1a1a,
+                metalness: 0.6,
+                roughness: 0.3
+            });
+            const djBooth = new THREE.Mesh(djBoothGeometry, djBoothMaterial);
+            djBooth.position.set(-2.5, 0.75, 5); // 往左移，靠近窗台
+            djBooth.castShadow = true;
+            scene.add(djBooth);
+            
+            // DJ 台上的設備
+            const equipmentGeometry = new THREE.BoxGeometry(2, 0.3, 1);
+            const equipmentMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                metalness: 0.8
+            });
+            const equipment = new THREE.Mesh(equipmentGeometry, equipmentMaterial);
+            equipment.position.set(-2.5, 1.65, 5);
+            scene.add(equipment);
+            
+            // === 主角（3D，再放大到 0.8x3.5 的圓柱體）===
+            const characterGeometry = new THREE.CylinderGeometry(0.8, 0.8, 3.5);
+            const characterMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFF6B6B,
+                roughness: 0.5
+            });
+            const character = new THREE.Mesh(characterGeometry, characterMaterial);
+            character.position.set(2, 1.75, 1.5); // 在地毯區域
+            character.castShadow = true;
+            scene.add(character);
+            
+            // 主角的頭（簡單球體，也放大）
+            const headGeometry = new THREE.SphereGeometry(0.6, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFDAB9
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.set(2, 3.8, 1.5);
+            scene.add(head);
+            
+            // === PNG 貼圖物件們 ===
+            
+            // 書桌（PNG，放在北邊左側）
+            const deskTexture = createPNGTexture('#654321', '📚 書桌');
+            const deskGeometry = new THREE.PlaneGeometry(3, 3);
+            const deskMaterial = new THREE.MeshBasicMaterial({ 
+                map: deskTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const desk = new THREE.Mesh(deskGeometry, deskMaterial);
+            desk.position.set(-4, 2, -6.5);
+            scene.add(desk);
+            
+            // 畫架（PNG，放在北邊右側）
+            const easelTexture = createPNGTexture('#8B4513', '🎨 畫架');
+            const easelGeometry = new THREE.PlaneGeometry(2.5, 3.5);
+            const easelMaterial = new THREE.MeshBasicMaterial({ 
+                map: easelTexture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const easel = new THREE.Mesh(easelGeometry, easelMaterial);
+            easel.position.set(4, 2.5, -6.5);
+            scene.add(easel);
+            
+            // 落地窗（PNG，放在西牆）
+            const windowTexture = createPNGTexture('#87CEEB', '🪟 窗戶');
+            const windowGeometry = new THREE.PlaneGeometry(3, 4);
+            const windowMaterial = new THREE.MeshBasicMaterial({ 
+                map: windowTexture,
+                transparent: true,
+                opacity: 0.8
+            });
+            const window = new THREE.Mesh(windowGeometry, windowMaterial);
+            window.position.set(-7.9, 3, 0);
+            window.rotation.y = Math.PI / 2;
+            scene.add(window);
+            
+            // 鳥（PNG，窗外）
+            const birdTexture = createPNGTexture('#FFD700', '🐦 鳥');
+            const birdGeometry = new THREE.PlaneGeometry(1, 1);
+            const birdMaterial = new THREE.MeshBasicMaterial({ 
+                map: birdTexture,
+                transparent: true
+            });
+            const bird = new THREE.Mesh(birdGeometry, birdMaterial);
+            bird.position.set(-7.5, 6, 2);
+            bird.rotation.y = Math.PI / 2;
+            scene.add(bird);
+            
+            // 盆栽（Sprite，永遠面朝鏡頭）
+            const plantTexture = createPNGTexture('#2F4F2F', '🪴 盆栽');
+            const plantMaterial = new THREE.SpriteMaterial({ 
+                map: plantTexture,
+                transparent: true
+            });
+            const plant = new THREE.Sprite(plantMaterial);
+            plant.position.set(6, 1, -3);
+            plant.scale.set(1.5, 2, 1);
+            scene.add(plant);
+            
+            // 大盆栽（書桌前方牆角，Sprite）
+            const bigPlantTexture = createPNGTexture('#228B22', '🌿 大盆栽');
+            const bigPlantMaterial = new THREE.SpriteMaterial({ 
+                map: bigPlantTexture,
+                transparent: true
+            });
+            const bigPlant = new THREE.Sprite(bigPlantMaterial);
+            bigPlant.position.set(-6.5, 2, -6.5); // 西北牆角
+            bigPlant.scale.set(2.5, 3.5, 1);
+            scene.add(bigPlant);
+            
+            // 海報（PNG，貼在牆上）
+            const posterTexture = createPNGTexture('#8B008B', '🎵 海報');
+            const posterGeometry = new THREE.PlaneGeometry(2, 3);
+            const posterMaterial = new THREE.MeshBasicMaterial({ 
+                map: posterTexture,
+                transparent: true
+            });
+            const poster = new THREE.Mesh(posterGeometry, posterMaterial);
+            poster.position.set(0, 5, -7.9);
+            scene.add(poster);
+            
+            // 唱盤（Sprite，永遠面朝鏡頭）
+            const vinylTexture = createPNGTexture('#1a1a1a', '💿 唱盤');
+            const vinylMaterial = new THREE.SpriteMaterial({ 
+                map: vinylTexture,
+                transparent: true
+            });
+            const vinyl = new THREE.Sprite(vinylMaterial);
+            vinyl.position.set(6, 1.5, 4);
+            vinyl.scale.set(2, 2, 1);
+            scene.add(vinyl);
+            
+            // 添加文字標籤
+            addLabel('DJ 台 (3D)', -2.5, 3, 5);
+            addLabel('主角 (3D)', 2, 5, 1.5);
+            addLabel('盆栽/唱盤會跟著鏡頭旋轉', 6, 3.5, 0);
+        }
+        
+        function addLabel(text, x, y, z) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+            
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = 'Bold 36px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.fillText(text, 256, 70);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(3, 0.75, 1);
+            scene.add(sprite);
+        }
+        
+        function setCameraView(x, y, z) {
+            camera.position.set(x, y, z);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // 啟動
+        init();
+    </script>
+</body>
+</html>
