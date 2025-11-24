@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useDrag } from '@use-gesture/react'
 import { useStore, WAYPOINTS } from '../store'
-import { Html } from '@react-three/drei'
+import { Html, useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 
 export function Character() {
@@ -10,6 +10,23 @@ export function Character() {
   const { characterState, targetPosition, setCharacterState, setTargetPosition, pickRandomWaypoint, triggerRandomDialogue, dialogue } = useStore()
   const { size, viewport } = useThree()
   const aspect = size.width / viewport.width
+
+  // Load GLB Model & Animations
+  const { scene, animations } = useGLTF('/walk.glb')
+  const { actions, names } = useAnimations(animations, ref)
+
+  // Animation Logic
+  useEffect(() => {
+    // If there are animations, play the first one when walking
+    if (names.length > 0) {
+      const action = actions[names[0]]
+      if (characterState === 'WALKING') {
+        action.reset().fadeIn(0.2).play()
+      } else {
+        action.fadeOut(0.2)
+      }
+    }
+  }, [characterState, actions, names])
 
   // Drag logic
   const bind = useDrag(({ active, movement: [mx, my], offset: [ox, oy], timeStamp }) => {
@@ -35,8 +52,8 @@ export function Character() {
       if (ref.current) {
         // Update target position to where we dropped it (clamped to floor)
         const dropPos = ref.current.position.clone()
-        dropPos.y = 0.25 // Force floor level (Center of 2.5h capsule on -1 floor)
-        setTargetPosition([dropPos.x, 0.25, dropPos.z])
+        dropPos.y = 0 // Force floor level (Model pivot usually at feet)
+        setTargetPosition([dropPos.x, 0, dropPos.z])
       }
     }
   }, { pointerEvents: true })
@@ -88,16 +105,22 @@ export function Character() {
 
       if (distance > 0.1) {
         direction.normalize()
-        ref.current.position.add(direction.multiplyScalar(delta * 2)) // Speed 2
+        const newPos = ref.current.position.clone().add(direction.multiplyScalar(delta * 2))
+
+        // Clamp position to room boundaries
+        newPos.x = THREE.MathUtils.clamp(newPos.x, -5.5, 5.5)
+        newPos.z = THREE.MathUtils.clamp(newPos.z, -5.5, 5.5)
+
+        ref.current.position.copy(newPos)
 
         // Look at target
         ref.current.lookAt(target.x, currentPos.y, target.z)
 
-        // Bobbing
-        ref.current.position.y = 0.5 + Math.sin(state.clock.elapsedTime * 10) * 0.1 // Base height 0.5 (larger char)
+        // Bobbing (Disabled if using animation)
+        // ref.current.position.y = 0 + Math.sin(state.clock.elapsedTime * 10) * 0.05 
       } else {
         // Arrived
-        ref.current.position.set(targetPosition[0], 0.5, targetPosition[2])
+        ref.current.position.set(targetPosition[0], 0, targetPosition[2])
 
         // Determine state based on location
         if (targetPosition === WAYPOINTS.RUG) setCharacterState('MEDITATING')
@@ -111,15 +134,17 @@ export function Character() {
       const time = state.clock.elapsedTime
 
       if (characterState === 'MEDITATING' || characterState === 'WORKING') {
-        // Sitting down
-        ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, -0.2, 0.1) // Lower body
+        // Sitting down - Adjust height for sitting
+        // Assuming model pivot is at feet, sitting might need lowering or animation
+        // For now, let's just lower slightly if it's a static mesh
+        // ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, -0.2, 0.1) 
       } else {
         // Standing / Dozing
-        ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, 0.5, 0.1) // Return to standing height
+        ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, 0, 0.1) // Return to floor
 
         // Dozing animation (slow nod)
-        ref.current.rotation.x = Math.sin(time * 2) * 0.1 // Nodding
-        ref.current.rotation.z = Math.sin(time * 1) * 0.05 // Swaying
+        ref.current.rotation.x = Math.sin(time * 2) * 0.05 // Nodding
+        ref.current.rotation.z = Math.sin(time * 1) * 0.02 // Swaying
       }
 
       // Reset rotation Y slowly if needed, or keep looking at target
@@ -127,25 +152,24 @@ export function Character() {
   })
 
   return (
-    <mesh
+    <group
       ref={ref}
-      position={[0, 0.5, 0]} // Initial height
+      position={[0, 0, 0]} // Initial height at floor (0) assuming pivot at feet
       onClick={triggerRandomDialogue}
       {...bind()}
-      castShadow>
-      {/* Larger Character: Radius 0.7, Height 2.5 */}
-      <capsuleGeometry args={[0.7, 2.5, 4, 8]} />
-      <meshStandardMaterial color={characterState === 'WALKING' ? 'hotpink' : characterState === 'DRAGGED' ? 'cyan' : 'orange'} />
+    >
+      {/* GLB Character Model */}
+      <primitive object={scene} scale={[3.6, 3.6, 3.6]} />
 
       {/* Dialogue Bubble */}
       {dialogue && (
-        <Html position={[0, 2.5, 0]} center>
+        <Html position={[0, 7.5, 0]} center>
           <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-xl shadow-lg border border-white/50 whitespace-nowrap pointer-events-none">
             <p className="text-gray-800 font-medium text-sm">{dialogue}</p>
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white/90 rotate-45 border-b border-r border-white/50"></div>
           </div>
         </Html>
       )}
-    </mesh>
+    </group>
   )
 }

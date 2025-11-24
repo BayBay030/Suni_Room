@@ -112,7 +112,7 @@ export function InteractiveObjects() {
             </mesh>
 
             {/* Single Bed (North Wall, Right of Desk) - NEW */}
-            <mesh position={[2, -0.4, -4.5]} scale={[1.2, 1.2, 1.2]}>
+            <mesh position={[2, -0.4, -4]} scale={[1.2, 1.2, 1.2]}>
                 <RoundedBox args={[2.5, 1, 4]} radius={0.1} smoothness={4}>
                     <meshStandardMaterial color="#F5E4E0" />
                 </RoundedBox>
@@ -123,6 +123,16 @@ export function InteractiveObjects() {
                     </RoundedBox>
                 </mesh>
             </mesh>
+
+            {/* 
+                GLB Model Placeholder
+                To use your GLB model:
+                1. Place your .glb file in the 'public' folder (e.g., public/my_model.glb)
+                2. Uncomment the lines below and change the path.
+                
+                const { scene } = useGLTF('/my_model.glb')
+                return <primitive object={scene} position={[0, 0, 0]} scale={[1, 1, 1]} />
+            */}
 
             {/* Desk (North-West) */}
             <mesh position={[-3, 0, -4.5]} scale={[1.2, 1.2, 1.2]}>
